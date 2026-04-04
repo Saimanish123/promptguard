@@ -11,6 +11,22 @@ tags:
   - security
   - llm-safety
   - prompt-injection
+short_description: LLM security sandbox for prompt injection evaluation
+---
+
+---
+title: PromptGuard
+emoji: 🛡️
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+license: mit
+tags:
+  - openenv
+  - security
+  - llm-safety
+  - prompt-injection
 short_description: Enterprise AI security sandbox for evaluating LLM robustness against prompt injection attacks
 ---
 
