@@ -1,3 +1,19 @@
+---
+title: PromptGuard
+emoji: 🛡️
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+license: mit
+tags:
+  - openenv
+  - security
+  - llm-safety
+  - prompt-injection
+short_description: Enterprise AI security sandbox for evaluating LLM robustness against prompt injection attacks
+---
+
 # PromptGuard — Enterprise AI Security Sandbox
 
 PromptGuard is an OpenEnv environment for evaluating LLM robustness against prompt injection attacks. An AI agent acts as an enterprise assistant with access to workplace tools and must complete legitimate tasks while detecting and refusing adversarial inputs.
