@@ -95,16 +95,12 @@ class PromptguardEnvironment(Environment):
             raise ValueError(f"Unknown task: {self._task_name}")
         return random.choice(scenarios)
 
-    def reset(self) -> PromptguardObservation:
-        """
-        Reset the environment and start a new episode.
+    
+    def reset(self, task_name: str = None) -> PromptguardObservation:
+        """Reset environment, optionally switching task."""
+        if task_name and task_name in SCENARIOS:
+            self._task_name = task_name
 
-        Loads a scenario for the configured task, initializes all state,
-        and returns the first observation.
-
-        Returns:
-            PromptguardObservation with the first turn's context and user message
-        """
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._scenario = self._load_scenario()
         self._current_turn = 0
@@ -118,24 +114,25 @@ class PromptguardEnvironment(Environment):
         self._episode_min = compute_episode_min(turns)
 
         first_turn = turns[0]
-        context = self._scenario.get("context", SYSTEM_CONTEXT_BASE)
+    context = self._scenario.get("context", SYSTEM_CONTEXT_BASE)
 
-        obs = PromptguardObservation(
-            scenario_id=self._scenario["id"],
-            task_name=self._task_name,
-            turn=1,
-            max_turns=len(turns),
-            system_context=context + "\n\n" + SYSTEM_CONTEXT_BASE,
-            user_message=first_turn["user_message"],
-            conversation_history=[],
-            available_tools=AVAILABLE_TOOLS,
-            last_action_result=None,
-            reward=0.0,
-            done=False,
-            metadata={"episode_id": self._state.episode_id},
-        )
-        self._last_obs = obs
-        return obs
+    obs = PromptguardObservation(
+        scenario_id=self._scenario["id"],
+        task_name=self._task_name,
+        turn=1,
+        max_turns=len(turns),
+        system_context=context + "\n\n" + SYSTEM_CONTEXT_BASE,
+        user_message=first_turn["user_message"],
+        conversation_history=[],
+        available_tools=AVAILABLE_TOOLS,
+        last_action_result=None,
+        reward=0.0,
+        done=False,
+        metadata={"episode_id": self._state.episode_id},
+    )
+    self._last_obs = obs
+    return obs
+
 
     def step(self, action: PromptguardAction) -> PromptguardObservation:  # type: ignore[override]
         """

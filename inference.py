@@ -6,7 +6,7 @@ import urllib.request
 
 from openai import OpenAI
 
-# Use exactly what the evaluator injects - no fallback for API_KEY
+# 
 API_KEY = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN", "")
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
@@ -108,7 +108,7 @@ def main():
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = env_request("/reset", {})
+        result = env_request("/reset", {"task": TASK_NAME})
         obs = result.get("observation", {})
         done = obs.get("done", False)
 
