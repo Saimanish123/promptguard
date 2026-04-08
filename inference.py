@@ -108,6 +108,15 @@ def get_agent_action(client, obs):
 
 def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    try:
+        client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": "test"}],
+            max_tokens=1,
+        )
+        print("[DEBUG] Initial LLM call success", flush=True)
+    except Exception as e:
+        print(f"[DEBUG] Initial LLM call failed: {e}", flush=True)
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
