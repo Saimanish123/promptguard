@@ -61,40 +61,50 @@ SYSTEM_PROMPT = textwrap.dedent("""
 
 
 def get_agent_action(client, obs):
-    history_lines = []
-    for turn in obs.get("conversation_history", [])[-6:]:
-        history_lines.append(f"{turn.get('role','').upper()}: {turn.get('content','')}")
-    history_block = "\n".join(history_lines) if history_lines else "None"
+    try:
+        history_lines = []
+        for turn in obs.get("conversation_history", [])[-6:]:
+            history_lines.append(f"{turn.get('role','').upper()}: {turn.get('content','')}")
+        history_block = "\n".join(history_lines) if history_lines else "None"
 
-    user_prompt = textwrap.dedent(f"""
-        Context: {obs.get('system_context', '')[:400]}
+        user_prompt = textwrap.dedent(f"""
+            Context: {obs.get('system_context', '')[:400]}
 
-        Conversation so far:
-        {history_block}
+            Conversation so far:
+            {history_block}
 
-        Current user message:
-        {obs.get('user_message', '')}
+            Current user message:
+            {obs.get('user_message', '')}
 
-        Respond with JSON tool call:
-    """).strip()
+            Respond with JSON tool call:
+        """).strip()
 
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.1,
-        max_tokens=300,
-        stream=False,
-    )
-    text = (completion.choices[0].message.content or "").strip()
-    if "```" in text:
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    parsed = json.loads(text.strip())
-    return parsed.get("tool_name", "refuse_request"), parsed.get("tool_args", {})
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+            max_tokens=300,
+        )
+
+        text = (completion.choices[0].message.content or "").strip()
+
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+
+        try:
+            parsed = json.loads(text.strip())
+            return parsed.get("tool_name", "refuse_request"), parsed.get("tool_args", {})
+        except:
+            return "refuse_request", {"reason": "invalid_json"}
+
+    except Exception as e:
+        print(f"[DEBUG] get_agent_action failed: {e}", flush=True)
+        return "refuse_request", {"reason": "model_error"}
 
 
 def main():
@@ -108,7 +118,15 @@ def main():
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = env_request("/reset", {})
+        result = env_request("/reset", {"task": TASK_NAME})
+    except Exception as e:
+        print(f"[DEBUG] Could not reset with task: {e}", flush=True)
+        try:
+            result = env_request("/reset", {})
+        except Exception as e2:
+            print(f"[DEBUG] Fallback reset also failed: {e2}", flush=True)
+        result = {"observation": {}, "done": True}
+
         obs = result.get("observation", {})
         done = obs.get("done", False)
 
@@ -152,7 +170,10 @@ def main():
         # Score strictly between 0 and 1 exclusive
         last_meta = obs.get("metadata", {})
         if "normalized_score" in last_meta:
-            raw = float(last_meta["normalized_score"])
+            try:
+                raw = float(last_meta.get("normalized_score", 0.5))
+            except:
+                raw = 0.5
         elif rewards:
             total = sum(rewards)
             n = len(rewards)
@@ -173,4 +194,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"[FATAL] {e}", flush=True)
+        log_end(success=False, steps=0, score=0.1, rewards=[])
