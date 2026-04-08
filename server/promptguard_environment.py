@@ -96,8 +96,8 @@ class PromptguardEnvironment(Environment):
         return random.choice(scenarios)
 
     
-    def reset(self, task_name: str = None) -> PromptguardObservation:
-        """Reset environment, optionally switching task."""
+    def reset(self, **kwargs):
+        task_name = kwargs.get("task")
         if task_name and task_name in SCENARIOS:
             self._task_name = task_name
 
