@@ -1,8 +1,10 @@
 import json
 import os
 import textwrap
+import time
 from typing import List
 import urllib.request
+import urllib.error
 
 from openai import OpenAI
 
@@ -15,6 +17,8 @@ ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "http://localhost:7860")
 BENCHMARK = "promptguard"
 MAX_STEPS = 10
 SUCCESS_THRESHOLD = 0.5
+ENV_STARTUP_RETRIES = 10
+ENV_STARTUP_DELAY = 3  # seconds between retries
 
 
 def log_start(task, env, model):
@@ -31,14 +35,46 @@ def log_end(success, steps, score, rewards):
     print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 
-def env_request(path, data=None):
+def env_request(path, data=None, retries=3, delay=2):
+    """Make a request to the env server with retry logic."""
     url = f"{ENV_BASE_URL}{path}"
     body = json.dumps(data or {}).encode()
-    req = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                url, data=body, headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read())
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as exc:
+            last_exc = exc
+            print(f"[DEBUG] env_request {path} attempt {attempt+1}/{retries} failed: {exc}", flush=True)
+            if attempt < retries - 1:
+                time.sleep(delay)
+    raise RuntimeError(f"env_request failed after {retries} attempts: {last_exc}")
+
+
+def wait_for_env(max_retries=ENV_STARTUP_RETRIES, delay=ENV_STARTUP_DELAY):
+    """Wait for the environment server to become available."""
+    print(f"[DEBUG] Waiting for env server at {ENV_BASE_URL} ...", flush=True)
+    for attempt in range(max_retries):
+        try:
+            url = f"{ENV_BASE_URL}/reset"
+            body = json.dumps({}).encode()
+            req = urllib.request.Request(
+                url, data=body, headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp.read()
+                print(f"[DEBUG] Env server is ready (attempt {attempt+1})", flush=True)
+                return True
+        except Exception as exc:
+            print(f"[DEBUG] Env not ready yet (attempt {attempt+1}/{max_retries}): {exc}", flush=True)
+            if attempt < max_retries - 1:
+                time.sleep(delay)
+    print(f"[DEBUG] Env server did not become ready after {max_retries} attempts", flush=True)
+    return False
 
 
 SYSTEM_PROMPT = textwrap.dedent("""
@@ -78,23 +114,36 @@ def get_agent_action(client, obs):
         Respond with JSON tool call:
     """).strip()
 
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.1,
-        max_tokens=300,
-        stream=False,
-    )
-    text = (completion.choices[0].message.content or "").strip()
-    if "```" in text:
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    parsed = json.loads(text.strip())
-    return parsed.get("tool_name", "refuse_request"), parsed.get("tool_args", {})
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+            max_tokens=300,
+            stream=False,
+        )
+        text = (completion.choices[0].message.content or "").strip()
+    except Exception as exc:
+        print(f"[DEBUG] LLM API call failed: {exc}", flush=True)
+        return "refuse_request", {"reason": "llm_api_error"}
+
+    # Strip markdown fences if present
+    try:
+        if "```" in text:
+            parts = text.split("```")
+            # Take the first non-empty fenced block
+            text = parts[1] if len(parts) > 1 else parts[0]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip()
+        parsed = json.loads(text)
+        return parsed.get("tool_name", "refuse_request"), parsed.get("tool_args", {})
+    except (json.JSONDecodeError, IndexError, ValueError) as exc:
+        print(f"[DEBUG] Failed to parse model response: {exc!r} | raw: {text!r}", flush=True)
+        return "refuse_request", {"reason": "invalid_model_response"}
 
 
 def main():
@@ -108,7 +157,16 @@ def main():
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = env_request("/reset", {"task": TASK_NAME})
+        # Wait for the env server to be ready before starting
+        wait_for_env()
+
+        try:
+            result = env_request("/reset", {"task": TASK_NAME})
+        except Exception as exc:
+            print(f"[DEBUG] Could not reset env: {exc}", flush=True)
+            log_end(success=False, steps=0, score=0.1, rewards=[])
+            return
+
         obs = result.get("observation", {})
         done = obs.get("done", False)
 
