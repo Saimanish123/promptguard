@@ -12,7 +12,7 @@ from openai import OpenAI
 API_KEY = os.environ["API_KEY"]
 API_BASE_URL = os.environ["API_BASE_URL"]
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-TASK_NAME = os.environ["PROMPTGUARD_TASK"]
+TASK_NAME = os.environ.get("PROMPTGUARD_TASK", "direct-override")
 
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "http://localhost:7860")
 BENCHMARK = "promptguard"
