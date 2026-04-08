@@ -235,4 +235,4 @@ class PromptguardEnvironment(Environment):
         Returns:
             State with episode_id and step_count
         """
-        return self._stategu
+        return self._state
