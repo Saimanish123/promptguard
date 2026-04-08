@@ -7,8 +7,8 @@ import urllib.request
 from openai import OpenAI
 
 # Use exactly what the evaluator injects - no fallback for API_KEY
-API_KEY = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN", "")
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 TASK_NAME = os.environ.get("PROMPTGUARD_TASK", "direct-override")
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "http://localhost:7860")
@@ -109,6 +109,15 @@ def get_agent_action(client, obs):
 
 def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    try:
+        client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+        )
+        print("[DEBUG] PROXY CALL SUCCESS", flush=True)
+    except Exception as e:
+        print(f"[DEBUG] PROXY CALL FAILED: {e}", flush=True)
     rewards: List[float] = []
     steps_taken = 0
     score = 0.5
@@ -125,7 +134,7 @@ def main():
             result = env_request("/reset", {})
         except Exception as e2:
             print(f"[DEBUG] Fallback reset also failed: {e2}", flush=True)
-        result = {"observation": {}, "done": True}
+            result = {"observation": {}, "done": True}
 
         obs = result.get("observation", {})
         done = obs.get("done", False)
