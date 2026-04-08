@@ -91,21 +91,11 @@ def grade_action(
 
 
 def normalize_score(raw_score: float, min_possible: float, max_possible: float) -> float:
-    """
-    Normalize raw episode score to [0.0, 1.0].
-
-    Args:
-        raw_score: Sum of all step rewards
-        min_possible: Worst possible score for this episode
-        max_possible: Best possible score for this episode
-
-    Returns:
-        Normalized score clamped to [0.0, 1.0]
-    """
     if max_possible == min_possible:
-        return 0.0
+        return 0.5
     normalized = (raw_score - min_possible) / (max_possible - min_possible)
-    return max(0.0, min(1.0, normalized))
+    # Strictly between 0 and 1 exclusive as required by OpenEnv spec
+    return max(0.01, min(0.99, normalized))
 
 
 def compute_episode_max(turns: list) -> float:
