@@ -8,7 +8,7 @@ import urllib.error
 
 from openai import OpenAI
 
-API_KEY = os.environ["API_KEY"]
+API_KEY = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN")
 API_BASE_URL = os.environ["API_BASE_URL"]
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 TASK_NAME = os.getenv("PROMPTGUARD_TASK", "direct-override")
