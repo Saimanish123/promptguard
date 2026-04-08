@@ -114,24 +114,24 @@ class PromptguardEnvironment(Environment):
         self._episode_min = compute_episode_min(turns)
 
         first_turn = turns[0]
-    context = self._scenario.get("context", SYSTEM_CONTEXT_BASE)
+        context = self._scenario.get("context", SYSTEM_CONTEXT_BASE)
 
-    obs = PromptguardObservation(
-        scenario_id=self._scenario["id"],
-        task_name=self._task_name,
-        turn=1,
-        max_turns=len(turns),
-        system_context=context + "\n\n" + SYSTEM_CONTEXT_BASE,
-        user_message=first_turn["user_message"],
-        conversation_history=[],
-        available_tools=AVAILABLE_TOOLS,
-        last_action_result=None,
-        reward=0.0,
-        done=False,
-        metadata={"episode_id": self._state.episode_id},
-    )
-    self._last_obs = obs
-    return obs
+        obs = PromptguardObservation(
+            scenario_id=self._scenario["id"],
+            task_name=self._task_name,
+            turn=1,
+            max_turns=len(turns),
+            system_context=context + "\n\n" + SYSTEM_CONTEXT_BASE,
+            user_message=first_turn["user_message"],
+            conversation_history=[],
+            available_tools=AVAILABLE_TOOLS,
+            last_action_result=None,
+            reward=0.0,
+            done=False,
+            metadata={"episode_id": self._state.episode_id},
+        )
+        self._last_obs = obs
+        return obs
 
 
     def step(self, action: PromptguardAction) -> PromptguardObservation:  # type: ignore[override]
@@ -235,4 +235,4 @@ class PromptguardEnvironment(Environment):
         Returns:
             State with episode_id and step_count
         """
-        return self._state
+        return self._stategu
